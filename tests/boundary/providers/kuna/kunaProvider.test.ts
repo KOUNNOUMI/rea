@@ -186,6 +186,27 @@ it("answers a cold request from one function, then serves the finished export", 
   await again.close();
 });
 
+it("runs every inventory with the configured decode lanes", async () => {
+  const { kuna, open } = await session(
+    "rea-kuna-inventory-jobs-",
+    { project: "hang" },
+    { REA_KUNA_JOBS: "4" },
+  );
+  const client = open();
+  try {
+    await run(client, "list_procedures");
+    await expect.poll(() => exportsOf(kuna)).toHaveLength(1);
+    const calls = await fakeKunaCalls(kuna);
+    const inventories = calls.filter(({ argv }) => argv[0] === "functions");
+    expect(inventories.length).toBeGreaterThan(0);
+    for (const { argv } of inventories)
+      expect(argv.slice(2)).toEqual(["--json", "--jobs", "4"]);
+    expect((await exportsOf(kuna))[0]?.argv.slice(-2)).toEqual(["--jobs", "4"]);
+  } finally {
+    expect(await client.close()).toEqual({ ok: true, value: null });
+  }
+});
+
 it("lists, searches and resolves procedures from Kuna's inventory", async () => {
   const { open } = await session("rea-kuna-inventory-");
   const client = open();
